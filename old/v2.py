@@ -35,7 +35,8 @@ words = [
     {'type': 'command', 'text': 'переход', 'command': 'prepare_jump'},
     {'type': 'command', 'text': 'поиск', 'command': 'prepare_search'},
     {'type': 'command', 'text': 'искать', 'command': 'execute_search'},
-    {'type': 'command', 'text': 'найти', 'command': 'execute_search'}
+    {'type': 'command', 'text': 'найти', 'command': 'execute_search'},
+    {'type': 'command', 'text': 'отмена', 'command': 'cancel'}
 ]
 
 num_words_map = {
@@ -254,6 +255,17 @@ def stream_comparator_event_word_equals(word):
         status_message = "[ПОИСК]: Ожидание ввода текста..."
     elif word['command'] == 'execute_search':
         perform_search_action()
+    elif word['command'] == 'cancel':
+        if is_search_mode:
+            is_search_mode = False
+            raw_voice_stream = ""
+            status_message = "Поиск отменён"
+        elif is_jump_mode:
+            is_jump_mode = False
+            jump_buffer = ""
+            status_message = "Переход отменён"
+        else:
+            status_message = "Отмена: нет активного режима"
     elif word['command'] == 'move_up_n':
         perform_jump_action(-1)
     elif word['command'] == 'move_down_n':
@@ -265,15 +277,40 @@ def stream_comparator_event_word_equals(word):
         move_focus(-1)
         status_message = "Шаг вверх"
     elif word['command'] == 'clear':
-        table_data[active_index]["curr"] = ""
-        status_message = "Значение строки очищено полностью"
-    elif word['command'] == 'backspace':
-        curr_val = str(table_data[active_index]["curr"])
-        if curr_val and curr_val not in ["недоступно", "отключено"]:
-            table_data[active_index]["curr"] = curr_val[:-1]
+        if is_search_mode:
+            ignore_current_char_in_search = True
+            raw_voice_stream = ""
+            status_message = "[ПОИСК]: Строка поиска очищена"
         else:
             table_data[active_index]["curr"] = ""
-        status_message = "Удалён последний символ ячейки"
+            status_message = "Значение строки очищено полностью"
+    elif word['command'] == 'backspace':
+        if is_search_mode:
+            ignore_current_char_in_search = True
+            cleaned = raw_voice_stream.rstrip()
+            if cleaned.lower().endswith("стерет"):
+                cleaned = cleaned[:-6].rstrip()
+            match = re.search(r'([А-ЯЁA-Z]+|\d+)\s*$', cleaned, flags=re.IGNORECASE)
+            if match:
+                last_token = match.group(1)
+                start_pos = match.start(1)
+                if last_token.isdigit() and len(last_token) > 1:
+                    cleaned = cleaned[:start_pos] + last_token[:-1]
+                else:
+                    cleaned = cleaned[:start_pos].rstrip()
+            raw_voice_stream = (cleaned + " ") if cleaned else ""
+            display_query = build_search_query(raw_voice_stream)
+            if display_query:
+                status_message = f"[ПОИСК]: Идентификатор -> {display_query}"
+            else:
+                status_message = "[ПОИСК]: Ожидание ввода текста..."
+        else:
+            curr_val = str(table_data[active_index]["curr"])
+            if curr_val and curr_val not in ["недоступно", "отключено"]:
+                table_data[active_index]["curr"] = curr_val[:-1]
+            else:
+                table_data[active_index]["curr"] = ""
+            status_message = "Удалён последний символ ячейки"
     elif word['command'] in ['txt_na', 'txt_off']:
         if not is_search_mode:
             table_data[active_index]["curr"] = word['text']
