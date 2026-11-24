@@ -55,6 +55,7 @@ jump_buffer = ""
 raw_voice_stream = ""
 is_jump_mode = False
 is_search_mode = False
+ignore_current_char_in_search = False
 
 
 def load_csv_data():
@@ -245,8 +246,10 @@ def stream_comparator_event_word_equals(word):
         jump_buffer = ""
         status_message = "[РЕЖИМ ПЕРЕХОДА]: Ожидание числа строк..."
     elif word['command'] == 'prepare_search':
+        global ignore_current_char_in_search
         is_search_mode = True
         is_jump_mode = False
+        ignore_current_char_in_search = True
         raw_voice_stream = ""
         status_message = "[ПОИСК]: Ожидание ввода текста..."
     elif word['command'] == 'execute_search':
@@ -335,19 +338,32 @@ def stream_comparator_input(input_char):
 
 
 def input_char_performer(char):
-    global is_search_mode, raw_voice_stream, status_message
+    global is_search_mode, raw_voice_stream, status_message, ignore_current_char_in_search
     if char == 'q':
         save_csv_data()
         global curses_no_exit
         curses_no_exit = False
         return
     stream_comparator_input(char)
+    if ignore_current_char_in_search:
+        ignore_current_char_in_search = False
+        redraw_interface()
+        return
     if '0' <= char <= '9':
         handle_digit_input(char)
-    elif is_search_mode and (char.isalpha() or char == ' '):
-        raw_voice_stream += char
+    elif is_search_mode:
+        if char.isalpha():
+            if raw_voice_stream and raw_voice_stream[-1].islower() and char.isupper():
+                raw_voice_stream += " "
+            raw_voice_stream += char
+        else:
+            if not raw_voice_stream.endswith(" "):
+                raw_voice_stream += " "
         display_query = build_search_query(raw_voice_stream)
-        status_message = f"[ПОИСК]: Идентификатор -> {display_query}"
+        if display_query:
+            status_message = f"[ПОИСК]: Идентификатор -> {display_query}"
+        else:
+            status_message = "[ПОИСК]: Ожидание ввода текста..."
     redraw_interface()
 
 
