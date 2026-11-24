@@ -163,19 +163,34 @@ def jump_focus(position):
         current_row = max(0, len(table_data) - view_height)
 
 
-def perform_search_action():
-    global raw_voice_stream, is_search_mode, active_index, current_row, screen_height, status_message
-    full_text = raw_voice_stream.upper()
+def build_search_query(stream_text, is_final=False):
+    full_text = stream_text.upper()
     parts = full_text.split("ПОИСК")
     query_raw = parts[-1] if len(parts) > 0 else full_text
 
-    query = query_raw.replace("ИСКАТЬ", "")
-    query = query.replace("НАЙТИ", "")
-    query = query.replace(" ", "").strip()
+    tokens = re.findall(r'[А-ЯЁA-Z]+|\d+', query_raw)
+    result_parts = []
+    stop_words = {"ПОИСК", "ИСКАТЬ", "НАЙТИ"}
 
-    if len(query) > 2 and (query.startswith("К") or query.startswith("Х") or query.startswith("Т")):
-        if not str(query.__getitem__(1)).isdigit():
-            query = query[1:]
+    for idx, token in enumerate(tokens):
+        if token in stop_words:
+            continue
+        if not is_final and idx == len(tokens) - 1 and not stream_text.endswith(" "):
+            if len(token) >= 2 and ("ИСКАТЬ".startswith(token) or "НАЙТИ".startswith(token)):
+                continue
+        if token.isdigit():
+            result_parts.append(token)
+        elif token.lower() in num_words_map:
+            result_parts.append(num_words_map[token.lower()])
+        else:
+            result_parts.append(token)
+
+    return "".join(result_parts)
+
+
+def perform_search_action():
+    global raw_voice_stream, is_search_mode, active_index, current_row, screen_height, status_message
+    query = build_search_query(raw_voice_stream, is_final=True)
 
     found = False
     if query:
@@ -277,8 +292,12 @@ def handle_digit_input(digit):
         jump_buffer += digit
         status_message = f"[РЕЖИМ ПЕРЕХОДА]: Число строк -> {jump_buffer}"
     elif is_search_mode:
-        raw_voice_stream += digit
-        display_query = raw_voice_stream.strip()
+        for word_num, dig in num_words_map.items():
+            if dig == digit and raw_voice_stream.lower().endswith(word_num):
+                raw_voice_stream = raw_voice_stream[:-len(word_num)]
+                break
+        raw_voice_stream += f" {digit} "
+        display_query = build_search_query(raw_voice_stream)
         status_message = f"[ПОИСК]: Идентификатор -> {display_query}"
     else:
         if table_data[active_index]["curr"] in ["недоступно", "отключено"]:
@@ -327,7 +346,7 @@ def input_char_performer(char):
         handle_digit_input(char)
     elif is_search_mode and (char.isalpha() or char == ' '):
         raw_voice_stream += char
-        display_query = raw_voice_stream.strip()
+        display_query = build_search_query(raw_voice_stream)
         status_message = f"[ПОИСК]: Идентификатор -> {display_query}"
     redraw_interface()
 
