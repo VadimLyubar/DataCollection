@@ -183,7 +183,7 @@ def build_search_query(stream_text, is_final=False):
         elif token.lower() in num_words_map:
             result_parts.append(num_words_map[token.lower()])
         else:
-            result_parts.append(token)
+            result_parts.append(token[0])
 
     return "".join(result_parts)
 
