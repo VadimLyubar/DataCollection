@@ -172,7 +172,7 @@ def build_search_query(stream_text, is_final=False):
 
     tokens = re.findall(r'[А-ЯЁA-Z]+|\d+', query_raw)
     result_parts = []
-    stop_words = {"ПОИСК", "ИСКАТЬ", "НАЙТИ"}
+    stop_words = {"ПОИСК", "ИСКАТЬ", "НАЙТИ", "Ь", "Ъ"}
 
     for idx, token in enumerate(tokens):
         if token in stop_words:
@@ -233,7 +233,7 @@ def perform_jump_action(direction):
 
 
 def stream_comparator_event_word_equals(word):
-    global status_message, is_jump_mode, is_search_mode, jump_buffer, raw_voice_stream
+    global status_message, is_jump_mode, is_search_mode, jump_buffer, raw_voice_stream, ignore_current_char_in_search
     if word['command'] == 'exit':
         global curses_no_exit
         save_csv_data()
@@ -247,7 +247,6 @@ def stream_comparator_event_word_equals(word):
         jump_buffer = ""
         status_message = "[РЕЖИМ ПЕРЕХОДА]: Ожидание числа строк..."
     elif word['command'] == 'prepare_search':
-        global ignore_current_char_in_search
         is_search_mode = True
         is_jump_mode = False
         ignore_current_char_in_search = True
